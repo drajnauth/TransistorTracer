@@ -1,0 +1,99 @@
+
+(rules PCB NPN Tracer V2
+  (snap_angle 
+    fortyfive_degree
+  )
+  (autoroute_settings
+    (fanout off)
+    (autoroute on)
+    (postroute on)
+    (vias on)
+    (via_costs 50)
+    (plane_via_costs 5)
+    (start_ripup_costs 100)
+    (start_pass_no 4)
+    (layer_rule F.Cu
+      (active on)
+      (preferred_direction horizontal)
+      (preferred_direction_trace_costs 1.0)
+      (against_preferred_direction_trace_costs 2.5)
+    )
+    (layer_rule B.Cu
+      (active on)
+      (preferred_direction vertical)
+      (preferred_direction_trace_costs 1.0)
+      (against_preferred_direction_trace_costs 1.7)
+    )
+  )
+  (rule
+    (width 250.0)
+    (clear 200.0)
+    (clear 125.0 (type smd_to_turn_gap))
+    (clear 500.0 (type default-kicad))
+  )
+  (padstack "Via[0-1]_800:400_um"
+    (shape
+      (circle F.Cu 800.0 0.0 0.0)
+    )
+    (shape
+      (circle B.Cu 800.0 0.0 0.0)
+    )
+    (attach off)
+  )
+  (via 
+    "Via[0-1]_800:400_um" "Via[0-1]_800:400_um" default
+  )
+  (via 
+    "Via[0-1]_800:400_um-kicad_default" "Via[0-1]_800:400_um" "kicad_default"
+  )
+  (via 
+    "Via[0-1]_800:400_um-Power" "Via[0-1]_800:400_um" Power
+  )
+  (via_rule
+    default "Via[0-1]_800:400_um"
+  )
+  (via_rule
+    "kicad_default" "Via[0-1]_800:400_um-kicad_default"
+  )
+  (via_rule
+    Power "Via[0-1]_800:400_um-Power"
+  )
+  (class default
+    5V GND "Vuc_COLLECTOR" "Vuc_BASE" VCC "Net-(D1-Pad1)" "Net-(D2-Pad2)" COLLECTOR{slash}DRAIN
+    "Net-(J2-Pad1)" "Net-(Q1-Pad1)" "Net-(J2-Pad3)" "VB_OUT" "Net-(R3-Pad2)" BASE{slash}GATE ADC4 ADC3
+    ADC2 ADC1 "unconnected-(TB1-Pad1)" "unconnected-(TB1-Pad2)" "unconnected-(TB1-Pad28)" "unconnected-(TB1-Pad5)" "unconnected-(TB1-Pad7)" "unconnected-(TB1-Pad8)"
+    "unconnected-(TB1-Pad9)" "unconnected-(TB1-Pad10)" "unconnected-(TB1-Pad11)" "unconnected-(TB1-Pad12)" "unconnected-(TB1-Pad14)" "unconnected-(TB1-Pad16)" "unconnected-(TB1-Pad17)" "unconnected-(TB1-Pad18)"
+    "unconnected-(TB1-Pad19)" "VC_OUT" "unconnected-(TB1-Pad25)" "unconnected-(TB1-Pad26)" "unconnected-(TB1-Pad30)" "Net-(Q2-Pad2)" "Net-(Q3-Pad2)" "Net-(Q4-Pad2)"
+    "Net-(Q5-Pad2)" "unconnected-(TB1-Pad3)" "Net-(Q5-Pad3)" "Net-(Q6-Pad2)" "Net-(Q6-Pad3)" "Net-(R1-Pad1)" "Net-(R4-Pad2)" "unconnected-(TB1-Pad15)"
+    "Net-(R18-Pad1)" "Net-(R17-Pad1)" "Net-(ADC1-Pad3)" "Net-(ADC2-Pad3)" "Net-(ADC3-Pad3)" "Net-(ADC4-Pad3)" "unconnected-(ZX1-Pad4)" "unconnected-(ZX1-Pad5)"
+    "unconnected-(ZX1-Pad6)" "unconnected-(ZX1-Pad7)" "unconnected-(ZX1-Pad8)" "unconnected-(ZX1-Pad12)" "unconnected-(ZX1-Pad13)"
+    (clearance_class default)
+    (via_rule default)
+    (rule
+      (width 250.0)
+    )
+    (circuit 
+      (use_layer F.Cu B.Cu)
+    )
+  )
+  (class "kicad_default"
+    (clearance_class "kicad_default")
+    (via_rule "kicad_default")
+    (rule
+      (width 250.0)
+    )
+    (circuit 
+      (use_layer F.Cu B.Cu)
+    )
+  )
+  (class Power
+    (clearance_class Power)
+    (via_rule Power)
+    (rule
+      (width 350.0)
+    )
+    (circuit 
+      (use_layer F.Cu B.Cu)
+    )
+  )
+)
