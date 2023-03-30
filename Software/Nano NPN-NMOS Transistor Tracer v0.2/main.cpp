@@ -28,19 +28,14 @@ unsigned long flags = 0;
 unsigned int errorcode = 0;
 
 int temp = 0;
+
+float vtemp = 0;
+float ctemp = 0;
 int i = 0;
-unsigned int addr;  // EEPROM starting address for calibration strut
+unsigned int addr = 0;  // EEPROM starting address for calibration strut
 
 struct TRACE_TRANS_STRUT *pts;
 struct TRACE_FET_STRUT *pfs;
-
-/*
-#include <EEPROM.h>
-  addr = 0;
-  EEPROM.put(addr, st);
-    memset((char *)&st, 0, sizeof(st));
-    EEPROM.get(addr, st);
-*/
 
 void setup() {
   Serial.begin(9600);
@@ -68,6 +63,19 @@ void setup() {
   } else {
     Serial.println("EE OK");
     printConfig(PRINT_ALL_VALUES);
+    Serial.print("Vcc is ");
+    vtemp = getVccVoltage();
+    Serial.println(vtemp, 1);
+    while (vtemp <= MIN_ALLOWED_VCC_VOLTAGE ||
+           vtemp > MAX_ALLOWED_VCC_VOLTAGE) {
+      Serial.println("Bad Vcc");
+      digitalWrite(LED_BUILTIN, HIGH);
+      delay(500);
+      digitalWrite(LED_BUILTIN, LOW);
+      delay(500);
+          vtemp = getVccVoltage();
+    }
+    Serial.println("Vcc ok");
   }
   Serial.write(prompt);
 }
@@ -77,9 +85,9 @@ void loop() {
     Serial.println("Vcc Off");
     for (i = 0; i < 5; i++) {
       digitalWrite(LED_BUILTIN, HIGH);
-      delay(250);
+      delay(500);
       digitalWrite(LED_BUILTIN, LOW);
-      delay(250);
+      delay(500);
     }
   } else {
     // Look for characters entered from the keyboard and process them
@@ -184,10 +192,6 @@ void Reset(void) {
 
 // Place program specific content here
 void executeSerial(char *str) {
-  // num defined the actual number of entries process from the serial buffer
-  // i is a generic counter
-  float vtemp, ctemp;
-
   // This function called when serial input in present in the serial buffer
   // The serial buffer is parsed and characters and numbers are scraped and
   // entered in the commands[] and numbers[] variables.
@@ -694,10 +698,12 @@ void showHelp(char puke) {
   Serial.println("M [R]");          // Measure voltage or raw ADC values
   Serial.println("P [3|10 [255]");  // Set PWM on pin 3 or pin 10
   Serial.println("R");              // Reset
-  Serial.println("S [V] [B|C] [O] [mV]");  // Set voltage on base or Vcc pin.  Set output voltage delivered to DUT
-  Serial.println("S [I] [uA]");        // Set current om base
-  Serial.println("S [U] [D|M|U]");     // Set default unit to decimal, Milla
-                                       // or Micro for currents
+  Serial.println(
+      "S [V] [B|C] [O] [mV]");   // Set voltage on base or Vcc pin.  Set output
+                                 // voltage delivered to DUT
+  Serial.println("S [I] [uA]");  // Set current om base
+  Serial.println("S [U] [D|M|U]");  // Set default unit to decimal, Milla
+                                    // or Micro for currents
   Serial.println("S [M] [B|C] [min] [max]");  // Set min max Vb and Vg
                                               // voltages to sweep
   Serial.println("S [R] [B|C] [R]");          // Set Rb or Rc resistor values

@@ -46,6 +46,19 @@ Vmeasured = ADC / V_conv
 #define VOLTAGE_SCALING 128
 #define MAX_SCALED_VOLTAGE (589)  // 4.6*128
 
+/*
+Resistor divider is 991 and 497. Divider is 497/(497+991)=0.3340
+ADC Voltage conversion is 4.88V/1024 so 1 ADC count is 4.766mV
+With resistive divider each count is actually 4.766mV/0.3340 = 14.26mV =
+0.01426V
+*/
+#define VOLTAGE_SENSE_CONVERSION \
+  0.01426  // V per count.  Multiply by ADC counts to get voltage in V
+#define MAX_ALLOWED_VCC_VOLTAGE \
+  14  // Any voltage above this could damage arduino
+#define MIN_ALLOWED_VCC_VOLTAGE \
+  8  // Arbituary set.  Vcc of 9 volts is barely usable
+
 #define MAX_VC_VOLTAGE 4.6
 #define MIN_VC_VOLTAGE 0.010
 #define NUM_VC_VOLTAGE 15
@@ -63,7 +76,6 @@ Vmeasured = ADC / V_conv
 #define CALIBRATION_VB_VOLTAGE 2.3
 
 #define THERMAL_VOLTAGE 0.026
-
 
 #define RC_RESISTORHIGH 32
 #define RC_RESISTORLOW 10

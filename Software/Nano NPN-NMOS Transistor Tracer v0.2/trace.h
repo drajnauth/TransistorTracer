@@ -20,6 +20,7 @@ void printConfig(char type);
 unsigned char checkSweepRange(void);
 unsigned char checkResistors(char type, char announce);
 unsigned char checkVcc(char type);
+float getVccVoltage(void);
 void printResistorValues(char type);
 
 #endif  // _TRACE_H_

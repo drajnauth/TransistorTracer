@@ -531,24 +531,25 @@ void getMaxVoltages(void) {
   clearSweepFlags();
 }
 
+float getVccVoltage (void) {
+    float temp;
+    temp = adcAverage(pts->PowerOnAnalogPin, ADC_BIT_SHIFT_AVERAGE);
+    temp *= VOLTAGE_SENSE_CONVERSION;
+    return temp;
+}
+
 unsigned char checkVcc(char type) {
   unsigned char bad = 0;
 
   if (type) {
     // Check if Vcc is powered
-    setVoltage(pts->VccOutPin, MAX_VC_VOLTAGE);
-    delay(PWM_SETTLE_TIME);
-    measureVoltages();
-    setVoltage(pts->VccOutPin, 0.0);  // Reduce heating
-
-    if (pts->VccVoltage <= MAX_VC_VOLTAGE) {
-      Serial.println("No Vcc");
+    if (getVccVoltage() < MIN_ALLOWED_VCC_VOLTAGE) {
       resetPins();
       clearSweepFlags();
       bad++;
     }
   } else {
-    if (!digitalRead(pts->PowerOnPin)) {
+    if (!digitalRead(pts->PowerOnDigitalPin)) {
       bad++;
     }
   }
@@ -563,18 +564,19 @@ void resetPins() {
   pinMode(pts->VcVoltagePin, INPUT);   // ADC input port
   pinMode(pts->Vb1VoltagePin, INPUT);  // ADC input port
   pinMode(pts->Vb2VoltagePin, INPUT);  // ADC input port
+  pinMode(pts->PowerOnAnalogPin, INPUT);
 
   analogReference(DEFAULT);  // Use 5v reference
 
   pinMode(pts->VccOutPin, OUTPUT);
   pinMode(pts->VbOutPin, OUTPUT);
-  pinMode(pts->PowerOnPin, INPUT);
+  pinMode(pts->PowerOnDigitalPin, INPUT);
 
-  digitalWrite(pts->VccVoltagePin, 0);  // disable pullup
-  digitalWrite(pts->VcVoltagePin, 0);   // disable pullup
-  digitalWrite(pts->Vb1VoltagePin, 0);  // disable pullup
-  digitalWrite(pts->Vb2VoltagePin, 0);  // disable pullup
-  digitalWrite(pts->PowerOnPin, 0);     // disable pullup
+  digitalWrite(pts->VccVoltagePin, 0);      // disable pullup
+  digitalWrite(pts->VcVoltagePin, 0);       // disable pullup
+  digitalWrite(pts->Vb1VoltagePin, 0);      // disable pullup
+  digitalWrite(pts->Vb2VoltagePin, 0);      // disable pullup
+  digitalWrite(pts->PowerOnDigitalPin, 0);  // disable pullup
 
   digitalWrite(pts->VccOutPin, 0);  // Zero output
   digitalWrite(pts->VbOutPin, 0);   // Zero output
@@ -611,7 +613,8 @@ void setDefaultLimits(void) {
   pts->Vb2VoltagePin = A2;  // NPN Vb2 measure voltage. WAS A4
   pts->VccOutPin = 10;      // PWM NPN Vc controlOutput pin
   pts->VbOutPin = 3;        // PWM NPN Vb control Output pin
-  pts->PowerOnPin = 12;
+  pts->PowerOnDigitalPin = 12;    // Digital sense pin for Vcc is connected
+  pts->PowerOnAnalogPin = A0;     // Vcc voltage measurement
 
   pts->rcresistor = pts->rbresistor = 0;
   pts->VcCalibration = pts->VbCalibration = 0;
