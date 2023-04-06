@@ -4,11 +4,10 @@
 
 #include <arduino.h>
 
-#define DEBUG_ENABLE
+#define EEPROM_HEADER 0xA0
 
-#define BANNER "\r\n\r\nTransistor Tracer v0.1b (C)VE3OOI"
-
-#define EEPROM_HEADER 0xA1
+#define FLASH_HELP    // Load help in flash so its not stored in RAM
+#define VERBOSE_HELP  // Verbose help messages - used up more memory
 
 /*
 ADC Calibration
@@ -74,6 +73,8 @@ With resistive divider each count is actually 4.766mV/0.3340 = 14.26mV =
 
 #define CALIBRATION_VC_VOLTAGE 4.6
 #define CALIBRATION_VB_VOLTAGE 2.3
+#define VOLTAGE_ON_THRESHOLD 0.1
+#define PWM_RESOLUTION 0.02  // This is max PWM pin voltage/255, for 4.9V, this is 0.02 
 
 #define THERMAL_VOLTAGE 0.026
 
@@ -88,6 +89,7 @@ With resistive divider each count is actually 4.766mV/0.3340 = 14.26mV =
 #define PRINT_BASE_VALUES 'B'
 #define PRINT_COLLECTOR_VALUES 'C'
 #define PRINT_ALL_VALUES 'A'
+#define PRINT_INPUT_SWEEP_VALUES 'I'
 
 #define QUIET 0
 #define PUKE 1

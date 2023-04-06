@@ -16,17 +16,16 @@ void doFETKSweep(void) {
   float lastid = 0;
   float lastvgs = 0;
 
-  printSweepValues(PRINT_BASE_VALUES);
+  printSweepValues(PRINT_INPUT_SWEEP_VALUES);
 
-  Serial.println("Wait...");
-  getVgsOn(pfs->vgmin, pfs->vgmax, (pfs->vginc / 4));
+  getVgsOn(pfs->VgControlMin, pfs->VgControlMax, (pfs->VgControlInc / 4));
 
   if (pfs->vgs_on != pfs->vgs_th) {
-    pts->k = 2 * pfs->ids_on / (pfs->vgs_th - pfs->vgs_on) /
+    pfs->k = 2 * pfs->ids_on / (pfs->vgs_th - pfs->vgs_on) /
              (pfs->vgs_th - pfs->vgs_on);
-    pts->gm = 2 * pts->k * (pfs->vgs - pfs->vgs_on);
+    pfs->gm = 2 * pfs->k * (pfs->vgs - pfs->vgs_on);
   } else {
-    pts->gm = pts->k = 0;
+    pfs->gm = pfs->k = 0;
   }
 
   Serial.print(" Vgs(th): ");
@@ -38,29 +37,28 @@ void doFETKSweep(void) {
   Serial.print(" Rds(on): ");
   Serial.print(pfs->rds_th, 4);
   Serial.print(" k: ");
-  Serial.print(pts->k, 4);
+  Serial.print(pfs->k, 4);
   Serial.print(" gm: ");
   Serial.println(pts->gm, 4);
 
   pts->VcControl = MAX_VC_VOLTAGE;  // Set to Max for FET
 
-  setVoltage(pts->VccOutPin, pts->VcControl);
-  delay(PWM_SETTLE_TIME);
-
-  for (pts->VbControl = pfs->vgmin; pts->VbControl < pfs->vgmax;
-       pts->VbControl += (pfs->vginc / 4)) {
+  for (pts->VbControl = pfs->VgControlMin; pts->VbControl < pfs->VgControlMax;
+       pts->VbControl += (pfs->VgControlInc / 4)) {
+    setVoltage(pts->VccOutPin, pts->VcControl);
     setVoltage(pts->VbOutPin, pts->VbControl);
     delay(PWM_SETTLE_TIME);
     measureVoltages();
 
     setVoltage(pts->VbOutPin, 0.0);  // Reduce heating
+    setVoltage(pts->VccOutPin, 0.0);
     delay(PWM_SETTLE_TIME);
 
     if ((pfs->vgs - lastvgs) > 0 && (pfs->id - lastid) > 0 &&
         (pfs->vgs - pfs->vgs_on) > 0) {
       pfs->k =
           2 * pfs->id / (pfs->vgs - pfs->vgs_on) / (pfs->vgs - pfs->vgs_on);
-      pts->gm = pfs->k * (pfs->vgs - pfs->vgs_on);
+      pfs->gm = pfs->k * (pfs->vgs - pfs->vgs_on);
       /*
       // Other equestions
         pts->gm = (pfs->id - lastid) / (pfs->vgs - lastvgs);
@@ -75,51 +73,6 @@ void doFETKSweep(void) {
     Serial.println("|");
   }
 
-  /*
-    Serial.println("Wait...");
-    getVgsOn(pfs->vgmin, pfs->vgmax, (pfs->vginc / 4));
-
-    if (pfs->vgs_on != pfs->vgs_th) {
-      pts->k =
-          pfs->ids_on / (pfs->vgs_th - pfs->vgs_on) / (pfs->vgs_th -
-    pfs->vgs_on); } else { pts->k = 0;
-    }
-
-    Serial.print(" Vgs(th): ");
-    Serial.print(pfs->vgs_on, 4);
-    Serial.print(" Ids(th): ");
-    Serial.print(pfs->ids_on, 4);
-    Serial.print(" Vgs(on): ");
-    Serial.print(pfs->vgs_th, 4);
-    Serial.print(" Rds(on): ");
-    Serial.print(pfs->rds_th, 4);
-    Serial.print(" k: ");
-    Serial.println(pts->k, 4);
-
-    pts->VcControl = MAX_VC_VOLTAGE;  // Set to Max for FET
-
-    setVoltage(pts->VccOutPin, pts->VcControl);
-    delay(PWM_SETTLE_TIME);
-
-    for (pts->VbControl = pfs->vgmin; pts->VbControl < pfs->vgmax;
-         pts->VbControl += (pfs->vginc / 4)) {
-      setVoltage(pts->VbOutPin, pts->VbControl);
-      delay(PWM_SETTLE_TIME);
-      measureVoltages();
-
-      setVoltage(pts->VbOutPin, 0.0);  // Reduce heating
-      delay(PWM_SETTLE_TIME);
-
-      if (pts->vgs > pfs->vgs_on) {
-        pts->k = pts->id / (pts->vgs - pfs->vgs_on) / (pts->vgs - pfs->vgs_on);
-        pts->gm = 2 * pts->k * (pts->vgs - pfs->vgs_on);
-        displayVoltages();
-      }
-    }
-    if (flags & EXPORT_DATA) {
-      Serial.println("|");
-    }
-  */
   resetPins();
   clearSweepFlags();
 }
@@ -129,27 +82,27 @@ void doOutputFETSweep() {
 
   printSweepValues(PRINT_ALL_VALUES);
 
-  pts->VbControl = pfs->vgmin;
+  pts->VbControl = pfs->VgControlMin;
   for (i = 0; i < pfs->nvg; i++) {  // Vg
-    setVoltage(pts->VbOutPin, pts->VbControl);
-    delay(PWM_SETTLE_TIME);
 
-    pts->VcControl = pfs->vdmin;
+    pts->VcControl = pfs->VdControlMin;
     for (j = 0; j < pfs->nvd; j++) {  // Vcc
+      setVoltage(pts->VbOutPin, pts->VbControl);
       setVoltage(pts->VccOutPin, pts->VcControl);
       delay(PWM_SETTLE_TIME);
 
       measureVoltages();
 
       setVoltage(pts->VccOutPin, 0.0);
+      setVoltage(pts->VbOutPin, 0.0);
       delay(PWM_SETTLE_TIME);
 
       displayVoltages();
 
-      pts->VcControl += pfs->vdinc;
+      pts->VcControl += pfs->VdControlInc;
     }
     Serial.println("=");
-    pts->VbControl += pfs->vginc;
+    pts->VbControl += pfs->VgControlInc;
   }
   if (flags & EXPORT_DATA) {
     Serial.println("|");
@@ -161,19 +114,22 @@ void doOutputFETSweep() {
 void getVgsOn(float min, float max, float inc) {
   float thresh, lastid, vbcontrol_on;
   unsigned char vgsComplete = 0;
+  unsigned char ret = 0;
+  unsigned int cycles = 0;
 
   pts->VcControl = MAX_VC_VOLTAGE;  // Set to Max for FET
-  setVoltage(pts->VccOutPin, pts->VcControl);
-  delay(PWM_SETTLE_TIME);
+  cycles = (unsigned int)((max - min) / inc);
 
   lastid = 1000;
   thresh = 0.0;
   for (pts->VbControl = min; pts->VbControl < max; pts->VbControl += inc) {
+    setVoltage(pts->VccOutPin, pts->VcControl);
     setVoltage(pts->VbOutPin, pts->VbControl);
     delay(PWM_SETTLE_TIME);
     measureVoltages();
 
     setVoltage(pts->VbOutPin, 0.0);  // Reduce heating
+    setVoltage(pts->VccOutPin, 0.0);
     delay(PWM_SETTLE_TIME);
 
     if (lastid == 1000 && pfs->id > 0) lastid = pfs->id;
@@ -193,6 +149,11 @@ void getVgsOn(float min, float max, float inc) {
         pfs->vgs_th = pfs->vgs;
         pts->VbControl = max + 1;
       }
+    }
+    if (ret++ > 16) {
+      Serial.print(ret);
+      Serial.print("/");
+      Serial.println(cycles);
     }
     lastid = pfs->id;
   }

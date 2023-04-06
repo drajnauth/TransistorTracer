@@ -15,25 +15,19 @@ extern unsigned long flags;
 void doNPNBetaSweep(void) {
   float lastib, lastic;
 
-  if (pts->vcmax == 0) {
-    pts->VcControl = 2.5;  // Set to half voltage (2.5 ==> Vcc x 0.5)
-  } else {
-    pts->VcControl = pts->vcmax;  // Set to Max for FET
-  }
-
-  printSweepValues(PRINT_BASE_VALUES);
-
-  setVoltage(pts->VccOutPin, pts->VcControl);
-  delay(PWM_SETTLE_TIME);
+  printSweepValues(PRINT_INPUT_SWEEP_VALUES);
+  pts->VcControl = pts->VcControlMax;
 
   lastib = lastic = 1000;
-  for (pts->VbControl = pts->vbmin; pts->VbControl < pts->vbmax;
-       pts->VbControl += (pts->vbinc / 4)) {
+  for (pts->VbControl = pts->VbControlMin; pts->VbControl < pts->VbControlMax;
+       pts->VbControl += (pts->VbControlInc / 4)) {
+    setVoltage(pts->VccOutPin, pts->VcControl);
     setVoltage(pts->VbOutPin, pts->VbControl);
     delay(PWM_SETTLE_TIME);
     measureVoltages();
 
     setVoltage(pts->VbOutPin, 0.0);  // Reduce heating
+    setVoltage(pts->VccOutPin, 0.0);
     delay(PWM_SETTLE_TIME);
 
     if (lastib != pts->ib && lastic != pts->ic && pts->beta > 0 &&
@@ -62,7 +56,8 @@ void doDiodeOutputSweep(void) {
   delay(PWM_SETTLE_TIME);
 
   avg = i = 0;
-  for (pts->VcControl = 0; pts->VcControl < pts->vcmax; pts->VcControl += 0.1) {
+  for (pts->VcControl = 0; pts->VcControl < pts->VcControlMax;
+       pts->VcControl += 0.1) {
     setVoltage(pts->VccOutPin, pts->VcControl);
     delay(PWM_SETTLE_TIME);
     measureVoltages();
@@ -90,35 +85,19 @@ void doDiodeOutputSweep(void) {
 void doNPNInputSweep() {
   float lastval;
 
-  if (pts->vbinc > 0.4) pts->vbinc /= 2;
-
-  if (flags & SWEEP_BJT_INPUT_DATA) {
-    if (pts->vcmax == 0) {
-      pts->VcControl = 2.5;  // Set to half voltage (2.5 ==> Vcc x 0.5)
-    } else {
-      pts->VcControl = pts->vcmax;  // Set to Max for FET
-    }
-  } else if (flags & SWEEP_FET_INPUT_DATA) {
-    if (pfs->vdmax == 0) {
-      pts->VcControl = MAX_VC_VOLTAGE;  // Set to Max for FET
-    } else {
-      pts->VcControl = pfs->vdmax;  // Set to Max for FET
-    }
-  }
-
-  printSweepValues(PRINT_BASE_VALUES);
-
-  setVoltage(pts->VccOutPin, pts->VcControl);
-  delay(PWM_SETTLE_TIME);
+  printSweepValues(PRINT_INPUT_SWEEP_VALUES);
+  pts->VcControl = pts->VcControlMax;
 
   lastval = 1000;
-  for (pts->VbControl = pts->vbmin; pts->VbControl < pts->vbmax;
-       pts->VbControl += pts->vbinc) {
+  for (pts->VbControl = pts->VbControlMin; pts->VbControl < pts->VbControlMax;
+       pts->VbControl += pts->VbControlInc) {
+    setVoltage(pts->VccOutPin, pts->VcControl);
     setVoltage(pts->VbOutPin, pts->VbControl);
     delay(PWM_SETTLE_TIME);
     measureVoltages();
 
     setVoltage(pts->VbOutPin, 0.0);  // Reduce heating
+    setVoltage(pts->VccOutPin, 0.0);
     delay(PWM_SETTLE_TIME);
 
     if (lastval != pts->ib) {
@@ -139,26 +118,25 @@ void doOutputNPNSweep() {
 
   printSweepValues(PRINT_ALL_VALUES);
 
-  pts->VbControl = pts->vbmin;
+  pts->VbControl = pts->VbControlMin;
   for (i = 0; i < pts->nvb; i++) {
-    setVoltage(pts->VbOutPin, pts->VbControl);
-    delay(PWM_SETTLE_TIME);
-
-    pts->VcControl = pts->vcmin;
+    pts->VcControl = pts->VcControlMin;
     for (j = 0; j < pts->nvc; j++) {  // Vcc Sweep.  Need to ensure same number
                                       // of elements per Vb setting!!!!!
+      setVoltage(pts->VbOutPin, pts->VbControl);
       setVoltage(pts->VccOutPin, pts->VcControl);
       delay(PWM_SETTLE_TIME);
 
       measureVoltages();
       setVoltage(pts->VccOutPin, 0.0);  // Reduce heating
+      setVoltage(pts->VbOutPin, 0.0);
       delay(PWM_SETTLE_TIME);
 
       displayVoltages();
-      pts->VcControl += pts->vcinc;
+      pts->VcControl += pts->VcControlInc;
     }
     Serial.println("=");
-    pts->VbControl += pts->vbinc;
+    pts->VbControl += pts->VbControlInc;
   }
 
   if (flags & EXPORT_DATA) {

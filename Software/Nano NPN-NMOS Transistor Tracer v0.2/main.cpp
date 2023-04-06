@@ -5,6 +5,7 @@
 
 #include "UART.h"  // VE3OOI Serial Interface Routines (TTY Commands)
 #include "defines.h"
+#include "help.h"
 #include "nfet.h"
 #include "npn.h"
 #include "trace.h"
@@ -55,9 +56,9 @@ void setup() {
     } else {
       Serial.println("EE INIT");
       setDefaultLimits();
-      pts->rcresistor = RC_RESISTORHIGH;
-      pts->rbresistor = RB_RESISTORLOW;
-      getMaxVoltages();
+      pts->rcResistor = RC_RESISTORHIGH;
+      pts->rbResistor = RB_RESISTORLOW;
+      getMinMaxVoltages();
       EEPROM.put(addr, *pfs);
     }
   } else {
@@ -73,7 +74,7 @@ void setup() {
       delay(500);
       digitalWrite(LED_BUILTIN, LOW);
       delay(500);
-          vtemp = getVccVoltage();
+      vtemp = getVccVoltage();
     }
     Serial.println("Vcc ok");
   }
@@ -185,7 +186,7 @@ void Reset(void) {
   resetPins();
   resetVoltages();
 
-  Serial.println(BANNER);
+  printBanner();
   resetSerial();
   Serial.write(prompt);
 }
@@ -218,7 +219,7 @@ void executeSerial(char *str) {
         if (!checkResistors('A', 1)) {
           break;
         }
-        getMaxVoltages();
+        getMinMaxVoltages();
       } else if (commands[1] == 'D') {
         setVoltage(pts->VbOutPin, CALIBRATION_VB_VOLTAGE);
         setVoltage(pts->VccOutPin, CALIBRATION_VC_VOLTAGE);
@@ -236,8 +237,8 @@ void executeSerial(char *str) {
       ////////////////////////////////////////////////////////////
     case 'D':  // Defaults
       setDefaultLimits();
-      pts->rcresistor = RC_RESISTORHIGH;
-      pts->rbresistor = RB_RESISTORLOW;
+      pts->rcResistor = RC_RESISTORHIGH;
+      pts->rbResistor = RB_RESISTORLOW;
       checkResistors('A', 1);
       break;
 
@@ -251,22 +252,23 @@ void executeSerial(char *str) {
       } else if (commands[1] == 'I') {  // Initialize EEPROM ADC values{
         Serial.println("EE INIT");
         setDefaultLimits();
-        pts->rcresistor = RC_RESISTORHIGH;
-        pts->rbresistor = RB_RESISTORLOW;
-        getMaxVoltages();
+        pts->rcResistor = RC_RESISTORHIGH;
+        pts->rbResistor = RB_RESISTORLOW;
+        getMinMaxVoltages();
         EEPROM.put(addr, *pfs);
 
         delay(500);  // Allow time for write to complete
         EEPROM.get(addr, *pfs);
         if (pfs->version == EEPROM_HEADER) {
-          printConfig(PRINT_ALL_VALUES);
+          Serial.println("EE check ok\r\n");
         } else {
           Serial.println("EE Err");
+          break;
         }
 
       } else if (commands[1] == 'W') {  // Initialize EEPROM ADC values{
-        if (!checkResistors('A', 1) || !checkSweepRange()) {
-          Serial.println("Cal Err");
+        if (!checkResistors('A', 0) || !checkSweepRange()) {
+          Serial.println("Config Err");
           break;
         }
 
@@ -285,7 +287,7 @@ void executeSerial(char *str) {
       //////// Help
       ////////////////////////////////////////////////////////////
     case 'H':  // Help
-      showHelp(QUIET);
+      printHelp();
       break;
 
       ////////////////////////////////////////////////////////////
@@ -337,32 +339,11 @@ void executeSerial(char *str) {
       Set Output Base current on pin numbers[0]
       =============================================================
       */
-      if (commands[1] == 'I') {  // set Vb current
+      if (commands[1] == 'V') {
         if (!checkResistors('A', 1)) {
           break;
         }
-        if (numbers[0] > (unsigned long)((float)MAX_VC_VOLTAGE *
-                                         (float)1000000 / pts->rbresistor)) {
-          Serial.print("uA < ");
-          Serial.println((unsigned long)((float)MAX_VC_VOLTAGE *
-                                         (float)1000000 / pts->rbresistor));
-          break;
-        }
-        Serial.print("uA: ");
-        Serial.println(numbers[1]);
-        setVbCurrent((float)numbers[1] / (float)1000000);
-        displayVoltages();
-        break;
-        /*
-        =============================================================
-        Set Output Voltage on Vb or Vcc pin
-        =============================================================
-        */
-      } else if (commands[1] == 'V') {
-        if (!checkResistors('A', 1)) {
-          break;
-        }
-        if (pts->vbmax == 0 || pts->vcmax == 0) {
+        if (pts->VbControlMax == 0 || pts->VcControlMax == 0) {
           Serial.println("Cal Err");
           break;
         }
@@ -371,7 +352,7 @@ void executeSerial(char *str) {
         vtemp = (float)numbers[0] / (float)1000;
         if (commands[2] == 'B') {
           temp = pts->VbOutPin;
-          ctemp = pts->vbmax * 1000;
+          ctemp = pts->VbControlMax * 1000;
           if (commands[3] == 'O') {
             if (pts->VbCalibration == 0) {
               Serial.println("Cal Err");
@@ -394,7 +375,7 @@ void executeSerial(char *str) {
 
         } else if (commands[2] == 'C') {
           temp = pts->VccOutPin;
-          ctemp = pts->vcmax * 1000;
+          ctemp = pts->VcControlMax * 1000;
           if (commands[3] == 'O') {
             if (pts->VcCalibration == 0) {
               Serial.println("Cal Err");
@@ -415,7 +396,7 @@ void executeSerial(char *str) {
             }
           }
         } else {
-          showHelp(PUKE);
+          printError(ERROR_GENERIC);
           break;
         }
 
@@ -449,7 +430,7 @@ void executeSerial(char *str) {
             Serial.print(" Err");
             break;
           }
-          pts->rcresistor = (int)numbers[0];
+          pts->rcResistor = (int)numbers[0];
           printResistorValues(PRINT_COLLECTOR_VALUES);
           break;
           ////// Base resistor
@@ -462,7 +443,7 @@ void executeSerial(char *str) {
             Serial.print(" Err");
             break;
           }
-          pts->rbresistor = (int)numbers[0];
+          pts->rbResistor = (int)numbers[0];
           printResistorValues(PRINT_BASE_VALUES);
           break;
         } else {
@@ -474,7 +455,12 @@ void executeSerial(char *str) {
         =============================================================
         */
       } else if (commands[1] == 'U') {  // set default Units
-        if (commands[2] != 'M' && commands[2] != 'U' && commands[2] != 'D') {
+        if (!commands[2]) {
+          Serial.print("Units: ");
+          Serial.println(pts->units);
+          break;
+        } else if (commands[2] != 'M' && commands[2] != 'U' &&
+                   commands[2] != 'D') {
           Serial.print("Units: ");
           Serial.println(pts->units);
           Serial.print("U U|M|D");
@@ -505,7 +491,7 @@ void executeSerial(char *str) {
           pts->nvb = (int)numbers[0];
           Serial.print("B/G: ");
           Serial.println(pts->nvb);
-          pts->vbinc = (pts->vbmax - pts->vbmin) / (float)pts->nvb;
+          pts->VbControlInc = (pts->VbControlMax - pts->VbControlMin) / (float)pts->nvb;
           break;
           ////// Collector points
         } else if (commands[2] == 'C') {
@@ -521,7 +507,7 @@ void executeSerial(char *str) {
           pts->nvc = (int)numbers[0];
           Serial.print("C/D: ");
           Serial.println(pts->nvc);
-          pts->vcinc = (pts->vcmax - pts->vcmin) / (float)pts->nvc;
+          pts->VcControlInc = (pts->VcControlMax - pts->VcControlMin) / (float)pts->nvc;
           break;
         } else {
           Serial.print("B/G: ");
@@ -562,9 +548,9 @@ void executeSerial(char *str) {
             Serial.println("Num Err");
             break;
           }
-          pts->vbmin = pfs->vgmin = ((float)numbers[0]) / 1000.0;
-          pts->vbmax = pfs->vgmax = ((float)numbers[1]) / 1000.0;
-          pts->vbinc = (pts->vbmax - pts->vbmin) / (float)pts->nvb;
+          pts->VbControlMin = pfs->vgmin = ((float)numbers[0]) / 1000.0;
+          pts->VbControlMax = pfs->vgmax = ((float)numbers[1]) / 1000.0;
+          pts->VbControlInc = (pts->VbControlMax - pts->VbControlMin) / (float)pts->nvb;
           pfs->vginc = (pfs->vgmax - pfs->vgmin) / (float)pfs->nvg;
           printSweepValues(PRINT_BASE_VALUES);
           ////// Collector Voltage
@@ -578,16 +564,16 @@ void executeSerial(char *str) {
             Serial.println("Num Err");
             break;
           }
-          pts->vcmin = pfs->vdmin = ((float)numbers[0]) / 1000.0;
-          pts->vcmax = pfs->vdmax = ((float)numbers[1]) / 1000.0;
-          pts->vcinc = (pts->vcmax - pts->vcmin) / (float)pts->nvc;
+          pts->VcControlMin = pfs->vdmin = ((float)numbers[0]) / 1000.0;
+          pts->VcControlMax = pfs->vdmax = ((float)numbers[1]) / 1000.0;
+          pts->VcControlInc = (pts->VcControlMax - pts->VcControlMin) / (float)pts->nvc;
           printSweepValues(PRINT_COLLECTOR_VALUES);
         } else {
           printSweepValues(PRINT_ALL_VALUES);
         }
         break;
       } else {
-        showHelp(PUKE);
+        printError(ERROR_GENERIC);
         break;
       }
       break;
@@ -630,7 +616,7 @@ void executeSerial(char *str) {
 
         } else {
           clearSweepFlags();
-          showHelp(PUKE);
+          printError(ERROR_GENERIC);
         }
 
         /*
@@ -646,7 +632,7 @@ void executeSerial(char *str) {
           flags = flags | SWEEP_DIODE_OUTPUT_DATA;
         } else {
           clearSweepFlags();
-          showHelp(PUKE);
+          printError(ERROR_GENERIC);
         }
 
         /*
@@ -672,52 +658,17 @@ void executeSerial(char *str) {
           flags = flags | SWEEP_FET_R_DATA;
         } else {
           clearSweepFlags();
-          showHelp(PUKE);
+          printError(ERROR_GENERIC);
         }
 
       } else {
         clearSweepFlags();
-        showHelp(PUKE);
+        printError(ERROR_GENERIC);
       }
       break;
 
     // If an undefined command is entered, display an error message
     default:
-      errorOut();
+      printError(ERROR_GENERIC);
   }
-}
-
-void showHelp(char puke) {
-  if (puke) Serial.println("** Err **");
-  Serial.println("C");              // Display current ADC values
-  Serial.println("C [R|M|D]");      // Display ADC values repeatly or
-                                    // get/save Max Vb and Vcc or Set default
-                                    // calibration values and measure ADC
-  Serial.println("D");              // set default values
-  Serial.println("E [I|P]");        // init EEPROM or print contents of eeprom
-  Serial.println("M [R]");          // Measure voltage or raw ADC values
-  Serial.println("P [3|10 [255]");  // Set PWM on pin 3 or pin 10
-  Serial.println("R");              // Reset
-  Serial.println(
-      "S [V] [B|C] [O] [mV]");   // Set voltage on base or Vcc pin.  Set output
-                                 // voltage delivered to DUT
-  Serial.println("S [I] [uA]");  // Set current om base
-  Serial.println("S [U] [D|M|U]");  // Set default unit to decimal, Milla
-                                    // or Micro for currents
-  Serial.println("S [M] [B|C] [min] [max]");  // Set min max Vb and Vg
-                                              // voltages to sweep
-  Serial.println("S [R] [B|C] [R]");          // Set Rb or Rc resistor values
-  Serial.println("S [P] [B|C] [n]");          // Set number of values to sweep
-                                              // between max and min
-
-  Serial.println(
-      "T [NI|NIV|NO|NB|NBC|NR|NG]");  // Trace NPN Input, NPN Input by
-                                      // voltage, NPN Output, NPN Beta
-                                      // w Ib as x, NPN Beta w Ic as x, Ic vs
-                                      // Re, Gm vs Ic EFet input, EFet output
-  Serial.println("T [FI|FIV|FO|FK|FG|FR]");  // EFET input, EFET input by
-                                             // voltage, EFET output, EFET
-                                             // K, Gm, Rds
-  Serial.println("T [DI|DO]");               // Diode input, Diode output using
-                                             // resistor R break;
 }

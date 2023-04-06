@@ -50,7 +50,7 @@ void displayVoltages(void) {
   if (flags & SWEEP_BJT_OUTPUT_DATA) {
     if (flags & EXPORT_DATA) {
       if (!pts->header) {
-        Serial.println("#Ib,Ic,Vce");
+        Serial.println("#Ib,Vce,Ic");
         pts->header = 0xff;
       }
       Serial.print("#");
@@ -215,7 +215,7 @@ void displayVoltages(void) {
   } else if (flags & SWEEP_FET_OUTPUT_DATA) {
     if (flags & EXPORT_DATA) {
       if (!pts->header) {
-        Serial.println("#Vgs,Id,Vds");
+        Serial.println("#Vgs,Vds,Id");
         pts->header = 0xff;
       }
       Serial.print("#");
@@ -356,8 +356,8 @@ void measureVoltages(void) {
   pts->vcc = pts->VccVoltage;
   pfs->vgd = pts->vbc = pts->VcVoltage - pts->Vb2Voltage;
 
-  pfs->ig = pts->ib = pts->vbr / (float)pts->rbresistor;
-  pfs->id = pts->ic = pts->vcr / (float)pts->rcresistor;
+  pfs->ig = pts->ib = pts->vbr / (float)pts->rbResistor;
+  pfs->id = pts->ic = pts->vcr / (float)pts->rcResistor;
   if (pts->ib > 0) {
     pts->beta = pts->ic / pts->ib;
   } else {
@@ -371,39 +371,6 @@ void measureVoltages(void) {
   } else {
     pts->re = pfs->rds = 0;
   }
-}
-
-void setVcVoltage(float voltage) {
-  float setvoltage = 0;
-  float delta = 0;
-  unsigned char exitloop = 0;
-
-  setvoltage = voltage;
-
-  while (exitloop < 50) {
-    setVoltage(pts->VccOutPin, setvoltage);
-    delay(PWM_SETTLE_TIME);
-    measureVoltages();
-    delta = abs(pts->VccVoltage - voltage);
-    if (delta <= ERROR_VC_VOLTAGE) {
-      break;
-    } else {
-      if (pts->VccVoltage > voltage) {
-        setvoltage -= (pts->VccVoltage - voltage);
-      } else if (pts->VccVoltage < voltage) {
-        setvoltage += (voltage - pts->VccVoltage);
-      }
-    }
-    exitloop++;
-  }
-}
-
-void setVbCurrent(float current) {
-  float voltage = 0;
-
-  voltage = current * pts->rbresistor + 0.7;
-  setVoltage(pts->VbOutPin, voltage);
-  delay(PWM_SETTLE_TIME);
 }
 
 void getADCValues(void) {
@@ -433,24 +400,37 @@ void getADCValues(void) {
   Serial.println(temp);
 }
 
-void getMaxVoltages(void) {
+void getMinMaxVoltages(void) {
   float maxvol = 0;
   float maxcon = 0;
+  float minvol = 0;
+  float mincon = 0;
   float lastvol = 0;
   float diff = 0;
   unsigned char ctr = 0;
+  int pwm = 0;
   int i = 0;
+  unsigned char loop = 0;
+    unsigned char print = 0;
   pts->VbCalibration = 0;
   pts->VcCalibration = 0;
 
-  Serial.println("Max Vb...");
-  for (pts->VbControl = 4; pts->VbControl <= MAX_VB_VOLTAGE;
-       pts->VbControl += 0.01) {
-    setVoltage(pts->VbOutPin, pts->VbControl);
+  Serial.println("Vb");
+  for (pwm = 0; pwm < 256; pwm++) {
+    analogWrite(pts->VbOutPin, pwm);
     delay(PWM_SETTLE_TIME);
     measureVoltages();
-    setVoltage(pts->VbOutPin, 0.0);  // Reduce heating
+    analogWrite(pts->VbOutPin, 0);  // Reduce heating
     diff = (pts->Vb1Voltage - lastvol);
+
+    pts->VbControl = map(pwm, 0, 255, 0, MAX_SCALED_VOLTAGE);
+    pts->VbControl /= (float)VOLTAGE_SCALING;
+
+    if (minvol == 0 && pts->Vb1Voltage > VOLTAGE_ON_THRESHOLD) {
+      minvol = pts->Vb1Voltage;
+      mincon = pts->VbControl;
+    }
+
     if (maxvol < pts->Vb1Voltage) {
       if (diff > 0 and diff > 0.001) {
         maxvol = pts->Vb1Voltage;
@@ -459,23 +439,43 @@ void getMaxVoltages(void) {
         i++;
         ctr = 0;
       }
-    } else if (diff < 0 || diff < 0.00001) {
+    } else if (pts->Vb1Voltage > 0 && (diff < 0 || diff < 0.00001)) {
       if (ctr++ > 10) {
-        pts->VbControl = MAX_VB_VOLTAGE + 1;
+        pwm = 300;
       }
+    }
+
+    if (loop++ >= print) {
+      Serial.print(loop);
+      Serial.println("/255");
+      print += 15;
     }
     lastvol = pts->Vb1Voltage;
   }
   if (i > 0) {
     pts->VbCalibration /= (float)i;
-    pts->vbmax = maxcon;
+    pts->VbControlMin = mincon;
+    pts->VbControlMax = maxcon;
+    pts->VbControlInc =
+        (pts->VbControlMax - pts->VbControlMin) / (float)pts->nvb;
+    if (pts->VbControlInc < PWM_RESOLUTION) pts->VbControlInc = PWM_RESOLUTION;
+    pts->vbmin = minvol;
+    pts->vbmax = maxvol;
     pts->vbinc = (pts->vbmax - pts->vbmin) / (float)pts->nvb;
+
+    Serial.println();
+    Serial.print("Min Vb: ");
+    Serial.print(minvol);
+    Serial.print(" at con: ");
+    Serial.println(mincon);
+
     Serial.print("Max Vb: ");
     Serial.print(maxvol);
     Serial.print(" at con: ");
     Serial.print(maxcon);
     Serial.print(" Cal: ");
     Serial.println(pts->VbCalibration, 3);
+    printOutputVoltageValues(PRINT_BASE_VALUES);
     printSweepValues(PRINT_BASE_VALUES);
 
   } else {
@@ -484,18 +484,30 @@ void getMaxVoltages(void) {
 
   maxvol = 0;
   maxcon = 0;
+  minvol = 0;
+  mincon = 0;
   lastvol = 0;
   diff = 0;
   ctr = 0;
   i = 0;
-  Serial.println("Max Vcc...");
-  for (pts->VcControl = 2; pts->VcControl <= MAX_VC_VOLTAGE;
-       pts->VcControl += 0.01) {
-    setVoltage(pts->VccOutPin, pts->VcControl);
+  loop = 0;
+  print = 0;
+  Serial.println("Vc");
+  for (pwm = 0; pwm < 256; pwm++) {
+    analogWrite(pts->VccOutPin, pwm);
     delay(PWM_SETTLE_TIME);
     measureVoltages();
-    setVoltage(pts->VccOutPin, 0.0);  // Reduce heating
+    analogWrite(pts->VccOutPin, 0);  // Reduce heating
     diff = (pts->VccVoltage - lastvol);
+
+    pts->VcControl = map(pwm, 0, 255, 0, MAX_SCALED_VOLTAGE);
+    pts->VcControl /= (float)VOLTAGE_SCALING;
+
+    if (minvol == 0 && pts->VccVoltage > VOLTAGE_ON_THRESHOLD) {
+      minvol = pts->VccVoltage;
+      mincon = pts->VcControl;
+    }
+
     if (maxvol < pts->VccVoltage) {
       if (diff > 0 and diff > 0.001) {
         maxvol = pts->VccVoltage;
@@ -505,23 +517,43 @@ void getMaxVoltages(void) {
         ctr = 0;
       }
 
-    } else if (diff < 0 || diff < 0.00001) {
+    } else if (pts->Vb1Voltage > 0 && (diff < 0 || diff < 0.00001)) {
       if (ctr++ > 10) {
-        pts->VcControl = MAX_VC_VOLTAGE + 1;
+        pwm = 300;
       }
+    }
+
+    if (loop++ >= print) {
+      Serial.print(loop);
+      Serial.println("/255");
+      print += 15;
     }
     lastvol = pts->VccVoltage;
   }
   if (i > 0) {
     pts->VcCalibration /= (float)i;
-    pts->vcmax = maxcon;
+    pts->VcControlMin = mincon;
+    pts->VcControlMax = maxcon;
+    pts->VcControlInc =
+        (pts->VcControlMax - pts->VcControlMin) / (float)pts->nvc;
+    if (pts->VcControlInc < PWM_RESOLUTION) pts->VcControlInc = PWM_RESOLUTION;
+    pts->vcmin = minvol;
+    pts->vcmax = maxvol;
     pts->vcinc = (pts->vcmax - pts->vcmin) / (float)pts->nvc;
+    if (pts->vcinc < PWM_RESOLUTION) pts->vcinc = PWM_RESOLUTION;
+    Serial.println();
+    Serial.print("Min Vcc: ");
+    Serial.print(minvol);
+    Serial.print(" at con: ");
+    Serial.println(mincon);
+
     Serial.print("Max Vcc: ");
     Serial.print(maxvol);
     Serial.print(" at con: ");
     Serial.print(maxcon);
     Serial.print(" Cal: ");
     Serial.println(pts->VcCalibration, 3);
+    printOutputVoltageValues(PRINT_COLLECTOR_VALUES);
     printSweepValues(PRINT_COLLECTOR_VALUES);
   } else {
     Serial.println("Vc Err");
@@ -531,11 +563,11 @@ void getMaxVoltages(void) {
   clearSweepFlags();
 }
 
-float getVccVoltage (void) {
-    float temp;
-    temp = adcAverage(pts->PowerOnAnalogPin, ADC_BIT_SHIFT_AVERAGE);
-    temp *= VOLTAGE_SENSE_CONVERSION;
-    return temp;
+float getVccVoltage(void) {
+  float temp;
+  temp = adcAverage(pts->PowerOnAnalogPin, ADC_BIT_SHIFT_AVERAGE);
+  temp *= VOLTAGE_SENSE_CONVERSION;
+  return temp;
 }
 
 unsigned char checkVcc(char type) {
@@ -607,31 +639,39 @@ void resetVoltages(void) {
 
 void setDefaultLimits(void) {
   pts->version = EEPROM_HEADER;
-  pts->VccVoltagePin = A4;  // NPN Vcc measure voltage.  Was A1
-  pts->VcVoltagePin = A3;   // NPN Vc measure voltage. Was A2
-  pts->Vb1VoltagePin = A1;  // NPN Vb1 measure voltage. Was A3
-  pts->Vb2VoltagePin = A2;  // NPN Vb2 measure voltage. WAS A4
-  pts->VccOutPin = 10;      // PWM NPN Vc controlOutput pin
-  pts->VbOutPin = 3;        // PWM NPN Vb control Output pin
-  pts->PowerOnDigitalPin = 12;    // Digital sense pin for Vcc is connected
-  pts->PowerOnAnalogPin = A0;     // Vcc voltage measurement
+  pts->VccVoltagePin = A4;      // NPN Vcc measure voltage.  Was A1
+  pts->VcVoltagePin = A3;       // NPN Vc measure voltage. Was A2
+  pts->Vb1VoltagePin = A1;      // NPN Vb1 measure voltage. Was A3
+  pts->Vb2VoltagePin = A2;      // NPN Vb2 measure voltage. WAS A4
+  pts->VccOutPin = 10;          // PWM NPN Vc controlOutput pin
+  pts->VbOutPin = 3;            // PWM NPN Vb control Output pin
+  pts->PowerOnDigitalPin = 12;  // Digital sense pin for Vcc is connected
+  pts->PowerOnAnalogPin = A0;   // Vcc voltage measurement
 
-  pts->rcresistor = pts->rbresistor = 0;
+  pts->rcResistor = pts->rbResistor = 0;
   pts->VcCalibration = pts->VbCalibration = 0;
 
-  pfs->units = (char)NULL;
+  pts->VcControlMin = MIN_VC_VOLTAGE;
+  pts->VcControlMax = MAX_VC_VOLTAGE;
+  pts->VcControlInc = (pfs->vdmax - pfs->vdmin) / (float)pfs->nvd;
+  ;
+  pts->VbControlMin = MIN_VB_VOLTAGE;
+  pts->VbControlMax = MAX_VB_VOLTAGE;
+  pts->VbControlInc = (pfs->vgmax - pfs->vgmin) / (float)pfs->nvg;
+
+  pfs->units = 'D';
   pfs->nvd = NUM_VC_VOLTAGE;
   pfs->nvg = NUM_VB_VOLTAGE;
-  pfs->vdmin = MIN_VC_VOLTAGE;
-  pfs->vdmax = MAX_VC_VOLTAGE;
-  pfs->vdinc = (pfs->vdmax - pfs->vdmin) / (float)pfs->nvd;
+  pfs->vdmin = 0;
+  pfs->vdmax = 0;
+  pfs->vdinc = 0;
 
-  pfs->vgmin = MIN_VB_VOLTAGE;
-  pfs->vgmax = MAX_VB_VOLTAGE;
-  pfs->vginc = (pfs->vgmax - pfs->vgmin) / (float)pfs->nvg;
+  pfs->vgmin = 0;
+  pfs->vgmax = 0;
+  pfs->vginc = 0;
 
-  pfs->VcControl = MIN_VC_VOLTAGE;
-  pfs->VbControl = MIN_VB_VOLTAGE;
+  pfs->VgControl = 0;
+  pfs->VdControl = 0;
 }
 
 void clearSweepFlags(void) {
@@ -661,19 +701,19 @@ void clearSweepFlags(void) {
 void printResistorValues(char type) {
   if (type == 'C' || type == 'A') {
     Serial.print("Rc/Rd: ");
-    Serial.println(pts->rcresistor);
+    Serial.println(pts->rcResistor);
   }
   if (type == 'B' || type == 'A') {
     Serial.print("Rb/Rg: ");
-    Serial.println(pts->rbresistor);
+    Serial.println(pts->rbResistor);
   }
 }
 
 unsigned char checkResistors(char type, char announce) {
   unsigned char bad = 0;
   if (type == 'C' || type == 'A') {
-    if ((pts->rcresistor == RC_RESISTORLOW ||
-         pts->rcresistor == RC_RESISTORHIGH)) {
+    if ((pts->rcResistor == RC_RESISTORLOW ||
+         pts->rcResistor == RC_RESISTORHIGH)) {
       if (announce) {
         printResistorValues(PRINT_COLLECTOR_VALUES);
       }
@@ -685,8 +725,8 @@ unsigned char checkResistors(char type, char announce) {
     }
   }
   if (type == 'B' || type == 'A') {
-    if (pts->rbresistor == RB_RESISTORLOW ||
-        pts->rbresistor == RB_RESISTORHIGH) {
+    if (pts->rbResistor == RB_RESISTORLOW ||
+        pts->rbResistor == RB_RESISTORHIGH) {
       if (announce) {
         printResistorValues(PRINT_BASE_VALUES);
       }
@@ -717,36 +757,75 @@ unsigned char checkSweepRange(void) {
 
 void printConfig(char type) {
   if (type == 'B' || type == 'A') {
+    printOutputVoltageValues(PRINT_BASE_VALUES);
     printSweepValues(PRINT_BASE_VALUES);
     Serial.print("Rb/Rg: ");
-    Serial.print(pts->rbresistor);
+    Serial.print(pts->rbResistor);
     Serial.print(" Cal: ");
     Serial.println(pts->VbCalibration);
   }
 
   if (type == 'C' || type == 'A') {
+    printOutputVoltageValues(PRINT_COLLECTOR_VALUES);
     printSweepValues(PRINT_COLLECTOR_VALUES);
     Serial.print("Rc/Rd: ");
-    Serial.print(pts->rcresistor);
+    Serial.print(pts->rcResistor);
     Serial.print(" Cal: ");
     Serial.println(pts->VcCalibration);
   }
 }
 
 void printSweepValues(char type) {
-  if (type == 'B' || type == 'A') {
+  if (type == PRINT_BASE_VALUES || type == PRINT_ALL_VALUES) {
     Serial.print("Sweep Vb/Vg: ");
-    Serial.print(pfs->vgmin);
+    Serial.print(pts->VbControlMin);
     Serial.print(" - ");
-    Serial.print(pfs->vgmax);
+    Serial.print(pts->VbControlMax);
     Serial.print("  points: ");
-    Serial.print(pfs->nvg);
+    Serial.print(pts->nvb);
     Serial.print(" delta: ");
-    Serial.println(pfs->vginc);
+    Serial.println(pts->VbControlInc);
   }
 
-  if (type == 'C' || type == 'A') {
+  if (type == PRINT_COLLECTOR_VALUES || type == PRINT_ALL_VALUES) {
     Serial.print("Sweep Vc/Vd: ");
+    Serial.print(pts->VcControlMin);
+    Serial.print(" - ");
+    Serial.print(pts->VcControlMax);
+    Serial.print(" points: ");
+    Serial.print(pts->nvc);
+    Serial.print(" delta: ");
+    Serial.println(pts->VcControlInc);
+  }
+
+  if (type == PRINT_INPUT_SWEEP_VALUES) {
+    Serial.print("Sweep Vb/Vg: ");
+    Serial.print(pts->VbControlMin);
+    Serial.print(" - ");
+    Serial.print(pts->VbControlMax);
+    Serial.print("  points: ");
+    Serial.print(pts->nvb);
+    Serial.print(" delta: ");
+    Serial.println(pts->VbControlInc);
+    Serial.print("Fixed Vc/Vd: ");
+    Serial.println(pts->VcControlMax);
+  }
+}
+
+void printOutputVoltageValues(char type) {
+  if (type == PRINT_BASE_VALUES || type == PRINT_ALL_VALUES) {
+    Serial.print("Output Vb/Vg: ");
+    Serial.print(pts->vbmin);
+    Serial.print(" - ");
+    Serial.print(pts->vbmax);
+    Serial.print("  points: ");
+    Serial.print(pts->nvb);
+    Serial.print(" delta: ");
+    Serial.println(pts->vbinc);
+  }
+
+  if (type == PRINT_COLLECTOR_VALUES || type == PRINT_ALL_VALUES) {
+    Serial.print("Output Vc/Vd: ");
     Serial.print(pts->vcmin);
     Serial.print(" - ");
     Serial.print(pts->vcmax);
@@ -754,5 +833,18 @@ void printSweepValues(char type) {
     Serial.print(pts->nvc);
     Serial.print(" delta: ");
     Serial.println(pts->vcinc);
+  }
+
+  if (type == PRINT_INPUT_SWEEP_VALUES) {
+    Serial.print("Output Vb/Vg: ");
+    Serial.print(pts->VbControlMin);
+    Serial.print(" - ");
+    Serial.print(pts->VbControlMax);
+    Serial.print("  points: ");
+    Serial.print(pts->nvb);
+    Serial.print(" delta: ");
+    Serial.println(pts->VbControlInc);
+    Serial.print("Fixed Vc/Vd: ");
+    Serial.println(pts->VcControlMax);
   }
 }
