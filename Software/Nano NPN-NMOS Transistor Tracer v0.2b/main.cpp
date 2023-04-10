@@ -512,9 +512,9 @@ void executeSerial(char *str) {
             printError(NUMERR);
             break;
           }
-          pts->VcControlMin = convertControlToOutput((float)numbers[0] / 1000,
+          pts->VcControlMin = convertOutputToControl((float)numbers[0] / 1000,
                                                      COLLECTOR_VALUES);
-          pts->VcControlMax = convertControlToOutput((float)numbers[1] / 1000,
+          pts->VcControlMax = convertOutputToControl((float)numbers[1] / 1000,
                                                      COLLECTOR_VALUES);
           pts->VcControlInc =
               (pts->VcControlMax - pts->VcControlMin) / (float)pts->nvc;
@@ -533,9 +533,9 @@ void executeSerial(char *str) {
             break;
           }
           pts->VbControlMin =
-              convertControlToOutput((float)numbers[0] / 1000, BASE_VALUES);
+              convertOutputToControl((float)numbers[0] / 1000, BASE_VALUES);
           pts->VbControlMax =
-              convertControlToOutput((float)numbers[1] / 1000, BASE_VALUES);
+              convertOutputToControl((float)numbers[1] / 1000, BASE_VALUES);
           pts->VbControlInc =
               (pts->VbControlMax - pts->VbControlMin) / (float)pts->nvb;
           printControlValues(BASE_VALUES);

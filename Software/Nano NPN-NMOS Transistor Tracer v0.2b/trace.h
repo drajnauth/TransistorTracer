@@ -20,6 +20,7 @@ void setUpPWM(void);
 void setVoltage(int pin, float voltage);
 void measureVoltages(void);
 float convertControlToOutput(float vol, char type);
+float convertOutputToControl(float vol, char type);
 float getVccVoltage(void);
 void waitForVcc(char type);
 float checkVcc(char type);

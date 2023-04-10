@@ -1,6 +1,7 @@
 #include "trace.h"
 
 #include <Arduino.h>
+
 #include "defines.h"
 #include "main.h"
 #include "nfet.h"
@@ -296,7 +297,6 @@ void displayVoltages(void) {
   }
 }
 
-
 void getMinMaxVoltages(void) {
   float maxvol = 0;
   float maxcon = 0;
@@ -336,9 +336,10 @@ void getMinMaxVoltages(void) {
       if (diff > 0 && diff > 0.001) {
         maxvol = pts->Vb1Voltage;
         maxcon = pts->VbControl;
-        i++;
+
         ctr = 0;
         if (minvol > 0) {
+          i++;
           sumx += pts->VbControl;
           sumy += pts->Vb1Voltage;
           sumx2 += (pts->VbControl * pts->VbControl);
@@ -382,9 +383,9 @@ void getMinMaxVoltages(void) {
     Serial.print(maxvol);
     Serial.print(" at con: ");
     Serial.print(maxcon);
-    Serial.print(" CalM: ");
+    Serial.print(" VbCalM: ");
     Serial.print(pts->bSlope, 3);
-    Serial.print(" CalB: ");
+    Serial.print(" VbCalB: ");
     Serial.println(pts->bInt, 3);
     printOutputVoltageValues(BASE_VALUES);
     printControlValues(BASE_VALUES);
@@ -429,10 +430,11 @@ void getMinMaxVoltages(void) {
       if (diff > 0 && diff > 0.001) {
         maxvol = pts->VccVoltage;
         maxcon = pts->VcControl;
-        i++;
+
         ctr = 0;
 
         if (minvol > 0) {
+          i++;
           sumx += pts->VcControl;
           sumy += pts->VccVoltage;
           sumx2 += (pts->VcControl * pts->VcControl);
@@ -478,9 +480,9 @@ void getMinMaxVoltages(void) {
     Serial.print(maxvol);
     Serial.print(" at con: ");
     Serial.print(maxcon);
-    Serial.print(" CalM: ");
+    Serial.print(" VcCalM: ");
     Serial.print(pts->cSlope, 3);
-    Serial.print(" CalB: ");
+    Serial.print(" VcCalB: ");
     Serial.println(pts->cInt, 3);
     printOutputVoltageValues(COLLECTOR_VALUES);
     printControlValues(COLLECTOR_VALUES);
@@ -518,11 +520,20 @@ void setVoltage(int pin, float voltage) {
   analogWrite(pin, calculatePWM(voltage));
 }
 
-float convertControlToOutput(float vol, char type) {
+float convertOutputToControl(float vol, char type) {
   if (type == COLLECTOR_VALUES) {
     return ((vol - pts->cInt) / pts->cSlope);
   } else if (type == BASE_VALUES) {
     return ((vol - pts->bInt) / pts->bSlope);
+  }
+  return 0;
+}
+
+float convertControlToOutput(float vol, char type) {
+  if (type == COLLECTOR_VALUES) {
+    return ((vol * pts->cSlope + pts->cInt));
+  } else if (type == BASE_VALUES) {
+    return ((vol * pts->bSlope + pts->bInt));
   }
   return 0;
 }
@@ -799,24 +810,41 @@ unsigned char checkSweepRange(void) {
 void printConfig(char type) {
   if (type == BASE_VALUES || type == ALL_VALUES) {
     printControlValues(BASE_VALUES);
-    printOutputVoltageValues(BASE_VALUES);
+
+    Serial.print("Max/Min Vb/Vg: ");
+    Serial.print(pts->vbmin, 3);
+    Serial.print(" - ");
+    Serial.print(pts->vbmax, 3);
+    Serial.print("  points: ");
+    Serial.print(pts->nvb);
+    Serial.print(" delta: ");
+    Serial.println(pts->vbinc, 3);
 
     Serial.print("Rb/Rg: ");
     Serial.print(pts->rbResistor);
-    Serial.print(" CalM: ");
+    Serial.print(" VbCalM: ");
     Serial.print(pts->bSlope, 3);
-    Serial.print(" CalB: ");
+    Serial.print(" VbCalB: ");
     Serial.println(pts->bInt, 3);
   }
 
   if (type == COLLECTOR_VALUES || type == ALL_VALUES) {
     printControlValues(COLLECTOR_VALUES);
-    printOutputVoltageValues(COLLECTOR_VALUES);
+
+    Serial.print("Max/Min Vc/Vd: ");
+    Serial.print(pts->vcmin, 3);
+    Serial.print(" - ");
+    Serial.print(pts->vcmax, 3);
+    Serial.print(" points: ");
+    Serial.print(pts->nvc);
+    Serial.print(" delta: ");
+    Serial.println(pts->vcinc, 3);
+
     Serial.print("Rc/Rd: ");
     Serial.print(pts->rcResistor);
-    Serial.print(" CalM: ");
+    Serial.print(" VcCalM: ");
     Serial.print(pts->cSlope, 3);
-    Serial.print(" CalB: ");
+    Serial.print(" VcCalB: ");
     Serial.println(pts->cInt, 3);
     ;
   }
@@ -862,36 +890,40 @@ void printControlValues(char type) {
 void printOutputVoltageValues(char type) {
   if (type == BASE_VALUES || type == ALL_VALUES) {
     Serial.print("Output Vb/Vg: ");
-    Serial.print(pts->vbmin, 3);
+    Serial.print(convertControlToOutput(pts->VbControlMin, BASE_VALUES), 3);
     Serial.print(" - ");
-    Serial.print(pts->vbmax, 3);
+    Serial.print(convertControlToOutput(pts->VbControlMax, BASE_VALUES), 3);
     Serial.print("  points: ");
     Serial.print(pts->nvb);
     Serial.print(" delta: ");
-    Serial.println(pts->vbinc, 3);
+    Serial.println(convertControlToOutput(pts->VbControlInc, BASE_VALUES), 3);
   }
 
   if (type == COLLECTOR_VALUES || type == ALL_VALUES) {
     Serial.print("Output Vc/Vd: ");
-    Serial.print(pts->vcmin, 3);
+    Serial.print(convertControlToOutput(pts->VcControlMin, COLLECTOR_VALUES),
+                 3);
     Serial.print(" - ");
-    Serial.print(pts->vcmax, 3);
-    Serial.print(" points: ");
+    Serial.print(convertControlToOutput(pts->VcControlMax, COLLECTOR_VALUES),
+                 3);
+    Serial.print("  points: ");
     Serial.print(pts->nvc);
     Serial.print(" delta: ");
-    Serial.println(pts->vcinc, 3);
+    Serial.println(convertControlToOutput(pts->VcControlInc, COLLECTOR_VALUES),
+                   3);
   }
 
   if (type == INPUT_SWEEP_VALUES) {
     Serial.print("Output Vb/Vg: ");
-    Serial.print(pts->vbmin, 3);
+    Serial.print(convertControlToOutput(pts->VbControlMin, BASE_VALUES), 3);
     Serial.print(" - ");
-    Serial.print(pts->vbmax, 3);
+    Serial.print(convertControlToOutput(pts->VbControlMax, BASE_VALUES), 3);
     Serial.print("  points: ");
     Serial.print(pts->nvb);
     Serial.print(" delta: ");
-    Serial.println(pts->vbinc, 3);
+    Serial.println(convertControlToOutput(pts->VbControlInc, BASE_VALUES), 3);
     Serial.print("Fixed Vc/Vd: ");
-    Serial.println(pts->vcmax, 3);
+    Serial.println(convertControlToOutput(pts->VcControlMax, COLLECTOR_VALUES),
+                   3);
   }
 }
