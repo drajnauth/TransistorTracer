@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <export version="E">
   <design>
-    <source>C:\Hobbies\Projects\Hardware\KiCad\Transistor Tracer\NPN Tracer\NPN Tracer V1\NPN Tracer V1.kicad_sch</source>
-    <date>3/27/2023 7:22:19 PM</date>
+    <source>C:\Hobbies\Projects\My Working Kits\TransistorTracer\NPN Tracer\NPN Tracer V1\NPN Tracer V1.kicad_sch</source>
+    <date>5/8/2023 3:06:13 PM</date>
     <tool>Eeschema (6.0.7)</tool>
     <sheet number="1" name="/" tstamps="/">
       <title_block>
@@ -25,7 +25,7 @@
   </design>
   <components>
     <comp ref="ADC1">
-      <value>10K</value>
+      <value>100K</value>
       <footprint>Potentiometer_THT:Potentiometer_Bourns_3296W_Vertical</footprint>
       <libsource lib="Device" part="R_Potentiometer_Trim" description="Trim-potentiometer"/>
       <property name="Sheetname" value=""/>
@@ -34,7 +34,7 @@
       <tstamps>c2eb2e02-d17b-49ff-96c7-78adc72290f8</tstamps>
     </comp>
     <comp ref="ADC2">
-      <value>10K</value>
+      <value>100K</value>
       <footprint>Potentiometer_THT:Potentiometer_Bourns_3296W_Vertical</footprint>
       <libsource lib="Device" part="R_Potentiometer_Trim" description="Trim-potentiometer"/>
       <property name="Sheetname" value=""/>
@@ -43,7 +43,7 @@
       <tstamps>1f0cb9ce-a194-4a86-9482-a4d1ab605e46</tstamps>
     </comp>
     <comp ref="ADC3">
-      <value>10K</value>
+      <value>100K</value>
       <footprint>Potentiometer_THT:Potentiometer_Bourns_3296W_Vertical</footprint>
       <libsource lib="Device" part="R_Potentiometer_Trim" description="Trim-potentiometer"/>
       <property name="Sheetname" value=""/>
@@ -52,7 +52,7 @@
       <tstamps>50ebf65d-5001-451f-a5b8-bfa545efd1bc</tstamps>
     </comp>
     <comp ref="ADC4">
-      <value>10K</value>
+      <value>100K</value>
       <footprint>Potentiometer_THT:Potentiometer_Bourns_3296W_Vertical</footprint>
       <libsource lib="Device" part="R_Potentiometer_Trim" description="Trim-potentiometer"/>
       <property name="Sheetname" value=""/>
@@ -97,7 +97,7 @@
       <tstamps>dd1b5d8b-c9ab-4ce2-a41c-8cc971becfbc</tstamps>
     </comp>
     <comp ref="C5">
-      <value>22u</value>
+      <value>1u</value>
       <footprint>Capacitor_THT:CP_Radial_D8.0mm_P2.50mm</footprint>
       <libsource lib="Device" part="C_Polarized" description="Polarized capacitor"/>
       <property name="Sheetname" value=""/>
@@ -315,7 +315,7 @@
       <tstamps>60f316a7-b362-4178-a714-2de17a8b6d65</tstamps>
     </comp>
     <comp ref="R4">
-      <value>500</value>
+      <value>499</value>
       <footprint>Resistor_THT:R_Axial_DIN0204_L3.6mm_D1.6mm_P5.08mm_Vertical</footprint>
       <libsource lib="Device" part="R_US" description="Resistor, US symbol"/>
       <property name="Sheetname" value=""/>
@@ -378,7 +378,7 @@
       <tstamps>05a1a9ab-a52a-4c53-b04e-bc58fa9c4284</tstamps>
     </comp>
     <comp ref="R11">
-      <value>500</value>
+      <value>499</value>
       <footprint>Resistor_SMD:R_1206_3216Metric_Pad1.30x1.75mm_HandSolder</footprint>
       <libsource lib="Device" part="R_US" description="Resistor, US symbol"/>
       <property name="Sheetname" value=""/>
